@@ -9,11 +9,11 @@ public class KickThingsHandler: MonoBehaviourPun
 {
     private const int KickThingsViewID = 5898;
     
-    private static KickThingsHandler _instance;
+    private static KickThingsHandler _instance = null!;
 
-    public PhotonView view;
+    public PhotonView view = null!;
 
-    private HashSet<int> registeredPlayers = new HashSet<int>();
+    private HashSet<int> m_registeredPlayers = [];
 
     public static KickThingsHandler Instance
     {
@@ -53,7 +53,7 @@ public class KickThingsHandler: MonoBehaviourPun
     [PunRPC]
     public void RPC_RegisterPlayer(int playerId)
     {
-        if (registeredPlayers.Add(playerId))
+        if (m_registeredPlayers.Add(playerId))
         {
             Plugin.Log.LogInfo($"Registered player #{playerId}");
         }
@@ -66,13 +66,13 @@ public class KickThingsHandler: MonoBehaviourPun
 
     public static bool IsRegistered(int playerId)
     {
-        return Instance.registeredPlayers.Contains(playerId);
+        return Instance.m_registeredPlayers.Contains(playerId);
     }
 
     public static void InitializeRegistry(int playerId)
     {
-        Instance.registeredPlayers.Clear();
-        Instance.registeredPlayers.Add(playerId);
+        Instance.m_registeredPlayers.Clear();
+        Instance.m_registeredPlayers.Add(playerId);
 
         if (PhotonNetwork.InRoom)
         {
