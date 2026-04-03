@@ -21,7 +21,11 @@ Some interaction may be reduced or behave a bit differently when players without
 ### Does this mod re-enable kicks in normal runs? ###
 
 No. This mod does NOT re-enable the kick in normal runs.
-It only expands the base kick. If you want to enable kicking in all runs, you can use another mod like [](),
+It only expands the base kick. 
+
+This means that you can either use it within a custom run by default.
+
+If you want to enable kicking in all runs, you can use another mod like [Better Kick](https://thunderstore.io/c/peak/p/AtomicStudio/Better_Kick/),
 
 ### Can I still kick my friends with this? ###
 
@@ -30,6 +34,6 @@ Yes. It only adds more interacations, so you can still kick your friends with it
 ## Bugs ##
 
 If you find any bugs,
-please [open an issue on the GitHub repository here](https://github.com/MiiMii1205/ScoutmasterVFXResetter/issues/new).
+please [open an issue on the GitHub repository here](https://github.com/MiiMii1205/KickThings/issues/new).
 
 Include as much info as possible, and we'll respond as soon as we can.
