@@ -28,4 +28,9 @@
     need to add it as a dependency in your manifest.json, of course
     -->
 
+    <ItemGroup>
+        <PackageReference Update="Hamunii.BepInEx.AutoPlugin" Version="*"/>
+    </ItemGroup>
+
+
 </Project>
