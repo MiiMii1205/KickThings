@@ -6,9 +6,9 @@ Adds new kick interactions for a wide variety of in-game objects.
 
 This mod adds new interactions when you kick in-game objects.
 
-For example, items are launched and luggages opens instantly. 
+For example, kicking items gets thrown around and luggages opens instantly. 
 
-There are amany other different types of interactions, so experiment and see what happens when you start kicking things!
+There are many other different types of interactions, so experiment and see what happens when you start kicking things!
 
 ## FAQ ##
 
@@ -20,12 +20,12 @@ Some interaction may be reduced or behave a bit differently when players without
 
 ### Does this mod re-enable kicks in normal runs? ###
 
-No. This mod does NOT re-enable the kick in normal runs.
+No. This mod does NOT re-enable kicks in normal runs.
 It only expands the base kick. 
 
-This means that you can either use it within a custom run by default.
+This means that by default you can only use it in a custom run.
 
-If you want to enable kicking in all runs, you can use another mod like [Better Kick](https://thunderstore.io/c/peak/p/AtomicStudio/Better_Kick/),
+If you want to enable kicks everywhere, you'll have to use another mod like [Better Kick](https://thunderstore.io/c/peak/p/AtomicStudio/Better_Kick/)
 
 ### Can I still kick my friends with this? ###
 
