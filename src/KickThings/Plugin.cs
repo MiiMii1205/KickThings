@@ -9,6 +9,7 @@ using KickThings.Handler;
 using KickThings.Patchers;
 using Peak.Network;
 using Photon.Pun;
+using PhotonCustomPropsUtils;
 using pworld.Scripts.Extensions;
 using UnityEngine;
 
@@ -64,18 +65,38 @@ public partial class Plugin : BaseUnityPlugin
     private void Awake()
     {
         Log = Logger;
+        Manager = PhotonCustomPropsUtilsPlugin.GetManager(Id);
         Instance = this;
         var harmony = new Harmony(Id);
+
+        Manager.RegisterPlayerProperty<bool>(nameof(KickThingsRegistered), PlayerEventType.All,
+            (player, b) => { KickThingsRegistered = b; });
+
+        Manager.RegisterOnJoinedRoom(SetupRegistered);
 
         harmony.PatchAll(typeof(KickPatcher));
         Log.LogInfo($"Plugin {Name} is loaded!");
     }
 
-    private void MakeBerriesFall(Character character, float maxBerries, List<Transform> spawnSpots, ref HashSet<int> activatedItemSet)
+    private void SetupRegistered(Photon.Realtime.Player player)
+    {
+        if (PhotonNetwork.InRoom && Manager != null)
+        {
+            Log.LogInfo($"Registering player {player} as a KickThings user.");
+            Manager.SetPlayerProperty(nameof(KickThingsRegistered), true);
+        }
+    }
+
+    private static bool KickThingsRegistered = false;
+
+    public static PhotonScopedManager? Manager { get; private set; }
+
+    private void MakeBerriesFall(Character character, float maxBerries, List<Transform> spawnSpots,
+        ref HashSet<int> activatedItemSet)
     {
         var totalSpawn = 0;
         var maxBerrySpawn = maxBerries;
-        
+
         foreach (var bushSpawnSpot in spawnSpots)
         {
             var possibleItems = new Collider[5];
@@ -99,6 +120,7 @@ public partial class Plugin : BaseUnityPlugin
             }
         }
     }
+
     public void FallBerries(Collider collider, BerryBush bush, Character character)
     {
         if (bush.isKinematic)
@@ -107,13 +129,13 @@ public partial class Plugin : BaseUnityPlugin
 
             var activatedItemSet = new HashSet<int>();
             MakeBerriesFall(character, bush.possibleBerries.y, bush.spawnSpots, ref activatedItemSet);
-            
+
             // check for beehives
 
             if (bush.gameObject.name.StartsWith("Jungle_Willow"))
             {
                 Log.LogInfo($"Checking for beehives on {bush}...");
-                
+
                 foreach (var col in Physics.OverlapBox(collider.bounds.center, collider.bounds.extents))
                 {
                     if (col == null || col.attachedRigidbody == null ||
@@ -133,7 +155,6 @@ public partial class Plugin : BaseUnityPlugin
                     }
                 }
             }
-            
         }
     }
 
@@ -146,38 +167,47 @@ public partial class Plugin : BaseUnityPlugin
             MakeBerriesFall(character, bv.possibleBerries.y, bv.spawnSpots, ref activatedItemSet);
         }
     }
-    
+
     public void ManageKick(CharacterGrabbing characterGrabbing)
     {
         this.StartCoroutine(DoKickThings(
             characterGrabbing.kickDelay, characterGrabbing.kickForce, characterGrabbing.character));
     }
-    
+
+    private static bool IsRegistered(Player player)
+    {
+        return PhotonNetwork.TryGetPlayer(player.GetActorNumber(), out var p) && 
+               (p.IsLocal && KickThingsRegistered ||
+            (!p.IsLocal &&
+             p.CustomProperties.ContainsKey(
+                 nameof(KickThingsRegistered))));
+    }
+
     private IEnumerator DoKickThings(float kickDelay, float kickForce, Character character)
     {
         yield return new WaitForSeconds(kickDelay);
-        
+
         var lookDir = character.data.lookDirection_Flat;
         var results = new Collider[10];
 
         var radius = Mathf.Max(character.refs.mainRenderer.bounds.extents.x,
             character.refs.mainRenderer.bounds.extents.z) / 2f;
-        
+
         var size = Physics.OverlapSphereNonAlloc(
             character.GetBodypart(BodypartType.Foot_R).transform.position + (radius * lookDir),
             radius, results, -1, QueryTriggerInteraction.Collide);
 
         var kickedThings = new HashSet<int>();
-        
+
         for (var i = 0; i < size; ++i)
         {
             var collider = results[i];
-            
+
             if (collider == null)
             {
                 continue;
             }
-            
+
             if (collider.attachedRigidbody != null && collider.attachedRigidbody is var rig)
             {
                 // Rigidbody-based interaction
@@ -191,37 +221,32 @@ public partial class Plugin : BaseUnityPlugin
                         var point = character.Center + character.data.lookDirection *
                             Vector3.Distance(character.Center, mob.Center());
 
-                        if(KickThingsHandler.IsRegistered(mob.photonView.Owner.ActorNumber))
-                        {
-                            KickThingsHandler.Instance.view.RPC("RPC_KickMob", RpcTarget.All,
-                                mob.photonView, character.data.lookDirection * kickForce, point);
-                            
-                        }
-                        else
-                        {
-                            Log.LogWarning($"Mob owner ({mob.photonView.Owner.ActorNumber}) is not registered. Not kicking mob {mob}");
-                        }
+                        // Requesting ownership for physics syncs 
+                        mob.photonView.RequestOwnership();
+
+                        yield return new WaitUntil(() => mob._mobItem.view.AmOwner);
+
+                        mob.mobState = Mob.MobState.RigidbodyControlled;
+
+                        mob.rig.AddForceAtPosition(character.data.lookDirection * kickForce, point, ForceMode.Impulse);
 
                         KickImpact(character, mob.gameObject,
                             point, ref
                             kickedThings);
-                        
                     }
-                    
-                } else if (rig.TryGetComponent(out Spider spid))
+                }
+                else if (rig.TryGetComponent(out Spider spid))
                 {
                     if (!kickedThings.Contains(mob.gameObject.GetInstanceID()))
                     {
                         Log.LogInfo($"Kicking spider: {spid}");
-                        
+
                         spid.Bonk();
-                        
+
                         KickImpact(character, spid.gameObject,
                             collider.ClosestPoint(character.Center + character.data.lookDirection), ref
                             kickedThings);
-                        
                     }
-                    
                 }
                 else if (rig.TryGetComponent(out Item it) && it.itemState == ItemState.Ground)
                 {
@@ -231,30 +256,25 @@ public partial class Plugin : BaseUnityPlugin
 
                         var point = character.Center + character.data.lookDirection *
                             Vector3.Distance(character.Center, it.Center());
-                        
-                        if (KickThingsHandler.IsRegistered(it.photonView.Owner.ActorNumber))
-                        {
-                            if (rig.isKinematic && kickableKinematicItemList.Contains(it.UIData.itemName))
-                            {
-                                it.SetKinematicNetworked(false);
-                                it.lastHolderCharacter = character;
-                            }
 
-                            KickThingsHandler.Instance.view.RPC("RPC_KickItem", RpcTarget.All,
-                                it.view, character.data.lookDirection * kickForce, point);
+                        // Requesting ownership for physics syncs 
+                        it.photonView.RequestOwnership();
 
-                        }
-                        else
+                        if (rig.isKinematic && kickableKinematicItemList.Contains(it.UIData.itemName))
                         {
-                            Log.LogWarning(
-                                $"Item owner ({it.photonView.Owner.ActorNumber}) is not registered. Not kicking item {it}");
+                            it.SetKinematicNetworked(false);
+                            it.lastHolderCharacter = character;
                         }
+
+                        yield return new WaitUntil(() => it.view.AmOwner);
+
+                        it.rig.AddForceAtPosition(character.data.lookDirection * kickForce, point, ForceMode.Impulse);
+
+                        it.physicsSyncer.ForceSyncForFrames();
 
                         KickImpact(character, it.gameObject, point, ref
                             kickedThings);
-                        
                     }
-                    
                 }
                 else if (rig.TryGetComponent(out RopeSegment seg) && seg.rope is { } rope)
                 {
@@ -266,31 +286,17 @@ public partial class Plugin : BaseUnityPlugin
 
                         var point = character.Center + character.data.lookDirection *
                             Vector3.Distance(character.Center, seg.Center());
-                        
-                        if (KickThingsHandler.IsRegistered(rope.photonView.Owner.ActorNumber))
-                        {
-                            var ind = rope.GetRopeSegments().IndexOf(seg.transform);
 
-                            KickThingsHandler.Instance.view.RPC("RPC_KickRopeSegment", RpcTarget.All, rope.view, ind,
-                                character.data.lookDirection * kickForce, point);
-                        }
-                        else
-                        {
-                            Log.LogWarning(
-                                $"Rope owner ({rope.photonView.Owner.ActorNumber}) is not registered. No physics for rope {rope}");
-                        }
-
-                        
                         // Make every climbing character fall.
                         foreach (var chara in rope.charactersClimbing)
                         {
-                            if(rope.antigrav ? chara.Center.y < point.y  : chara.Center.y > point.y)
+                            if (rope.antigrav ? chara.Center.y < point.y : chara.Center.y > point.y)
                             {
                                 Log.LogWarning(
                                     $"{chara.gameObject.name} is passed the affected segment. Skipping...");
                             }
 
-                            if (KickThingsHandler.IsRegistered(chara.player.photonView.Owner.ActorNumber))
+                            if (IsRegistered(chara.player))
                             {
                                 Log.LogWarning(
                                     $"Dropping {chara.gameObject.name} off of {rope}.");
@@ -303,12 +309,10 @@ public partial class Plugin : BaseUnityPlugin
                                     $"{chara.gameObject.name} is not registered. Not dropping them off of {rope}.");
                             }
                         }
-                        
+
                         KickImpact(character, rope.gameObject, point, ref
                             kickedThings);
-                        
                     }
-                    
                 }
             }
             else
@@ -322,19 +326,52 @@ public partial class Plugin : BaseUnityPlugin
                         Log.LogInfo($"Kicking Luggage: {luggage}");
                         // Open a luggage immediately
                         luggage.Interact_CastFinished(character);
-                        
+
                         KickImpact(character, luggage.gameObject,
                             collider.ClosestPoint(character.Center + character.data.lookDirection), ref
                             kickedThings);
-                        
                     }
-                    
+                }
+                else if (collider.TryGetComponent<RopeSegment>(out var seg) && seg.rope is { } rope)
+                {
+                    if (!kickedThings.Contains(rope.gameObject.GetInstanceID()))
+                    {
+                        Log.LogInfo($"Kicking no rig Rope: {rope}");
+
+                        var point = character.Center + character.data.lookDirection *
+                            Vector3.Distance(character.Center, seg.Center());
+
+                        // Make every climbing character fall.
+                        foreach (var chara in rope.charactersClimbing)
+                        {
+                            if (rope.antigrav ? chara.Center.y < point.y : chara.Center.y > point.y)
+                            {
+                                Log.LogWarning(
+                                    $"{chara.gameObject.name} is passed the affected segment. Skipping...");
+                            }
+
+                            if (IsRegistered(chara.player))
+                            {
+                                Log.LogWarning(
+                                    $"Dropping {chara.gameObject.name} off of {rope}.");
+                                chara.view.RPC("StopRopeClimbingRpc", RpcTarget.All);
+                                chara.view.RPC("RPCA_Fall", RpcTarget.All, 1);
+                            }
+                            else
+                            {
+                                Log.LogWarning(
+                                    $"{chara.gameObject.name} is not registered. Not dropping them off of {rope}.");
+                            }
+                        }
+
+                        KickImpact(character, rope.gameObject, point, ref
+                            kickedThings);
+                    }
                 }
                 else if (collider.GetComponentInParent<JungleVine>() is { } jungleVine && jungleVine != null)
                 {
                     if (jungleVine.displayName.Length > 0)
                     {
-
                         if (!kickedThings.Contains(jungleVine.gameObject.GetInstanceID()))
                         {
                             // Is a climbable vine.
@@ -345,7 +382,7 @@ public partial class Plugin : BaseUnityPlugin
                             {
                                 if (chara.data.heldVine == jungleVine && chara.data.isVineClimbing)
                                 {
-                                    if (KickThingsHandler.IsRegistered(chara.player.photonView.Owner.ActorNumber))
+                                    if (IsRegistered(chara.player))
                                     {
                                         Log.LogWarning(
                                             $"Dropping {chara.gameObject.name} off of {jungleVine}.");
@@ -369,9 +406,7 @@ public partial class Plugin : BaseUnityPlugin
                             KickImpact(character, jungleVine.gameObject,
                                 collider.ClosestPoint(character.Center + character.data.lookDirection), ref
                                 kickedThings);
-
                         }
-                        
                     }
                     else if (jungleVine.gameObject.TryGetComponent(out BreakableBridge bridge))
                     {
@@ -379,10 +414,11 @@ public partial class Plugin : BaseUnityPlugin
                         {
                             // Breakable bridge. It's now breaking, all thanks to you.
                             Log.LogInfo($"Kicking Breakable bridge: {bridge}");
-                            
-                            if (bridge.peopleOnBridgeDict.Keys.All((c)=> KickThingsHandler.IsRegistered(c.player.photonView.Owner.ActorNumber)))
+
+                            if (bridge.peopleOnBridgeDict.Keys.All((c) => IsRegistered(c.player)))
                             {
-                                Log.LogInfo($"Every people on the bridge are registered. Breaking {bridge}. Remember it's your fault {Character.localCharacter.characterName}");
+                                Log.LogInfo(
+                                    $"Every people on the bridge are registered. Breaking {bridge}. Remember it's your fault {Character.localCharacter.characterName}");
                                 bridge.photonView.RPC("ShakeBridge_Rpc", RpcTarget.All);
                             }
                             else
@@ -395,17 +431,17 @@ public partial class Plugin : BaseUnityPlugin
                             KickImpact(character, bridge.gameObject,
                                 collider.ClosestPoint(character.Center + character.data.lookDirection), ref
                                 kickedThings);
-
                         }
                     }
-                } else if (collider.GetComponentInParent<BerryBush>() is var bush && bush != null)
+                }
+                else if (collider.GetComponentInParent<BerryBush>() is var bush && bush != null)
                 {
                     if (!kickedThings.Contains(bush.gameObject.GetInstanceID()))
                     {
                         // Check for fruits/items 
-                        
+
                         FallBerries(collider, bush, character);
-                        
+
                         KickImpact(character, bush.gameObject,
                             collider.ClosestPoint(character.Center + character.data.lookDirection), ref
                             kickedThings);
@@ -415,7 +451,7 @@ public partial class Plugin : BaseUnityPlugin
         }
     }
 
-    private static void KickImpact(Character character, GameObject thing, Vector3 point, ref HashSet<int>  kickedThings)
+    private static void KickImpact(Character character, GameObject thing, Vector3 point, ref HashSet<int> kickedThings)
     {
         character.view.RPC("RPCA_KickImpact", RpcTarget.All, point);
         kickedThings.Add(thing.GetInstanceID());

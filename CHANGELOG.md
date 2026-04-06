@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0] - 2026-04-06
+
+### Changed
+
+- Fixed a bug with the mod registry
+- Replaced Item, Mobs and Rope RPCs with ownership transfer. 
+  - This makes it compatible with clients not using the mod
+
 ## [1.1.2] - 2026-04-06
 
 ### Changed

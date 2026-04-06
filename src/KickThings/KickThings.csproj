@@ -8,7 +8,7 @@
         <!-- This is the display name of your mod. Example: BepInEx Template -->
         <AssemblyTitle>KickThings</AssemblyTitle>
         <!-- This is the version number of your mod. -->
-        <Version>1.1.2</Version>
+        <Version>1.2.0</Version>
     </PropertyGroup>
 
     <!--
@@ -30,6 +30,7 @@
 
     <ItemGroup>
         <PackageReference Update="Hamunii.BepInEx.AutoPlugin" Version="*"/>
+        <PackageReference Include="Snosz-PhotonCustomPropsUtils" Version="1.1.0" Private="False"/>
     </ItemGroup>
 
 

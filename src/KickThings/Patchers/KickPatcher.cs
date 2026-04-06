@@ -12,11 +12,5 @@
      {
          Plugin.Instance.ManageKick(__instance);
      }
- 
-     [HarmonyPatch(typeof(RunManager), nameof(RunManager.StartRun))]
-     [HarmonyPostfix]
-     public static void StartRunPost(RunManager __instance)
-     {
-         KickThingsHandler.InitializeRegistry(PhotonNetwork.LocalPlayer.ActorNumber);
-     }
+     
  }

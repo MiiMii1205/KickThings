@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace KickThings.Handler;
 
-public class KickThingsHandler : MonoBehaviourPun
+public class KickThingsHandler : MonoBehaviourPunCallbacks
 {
     private const int KickThingsViewID = 5898;
 
@@ -27,6 +27,16 @@ public class KickThingsHandler : MonoBehaviourPun
             }
 
             return _instance;
+        }
+    }
+
+    public override void OnPlayerEnteredRoom(Photon.Realtime.Player newPlayer)
+    {
+        base.OnPlayerEnteredRoom(newPlayer);
+
+        if (PhotonNetwork.IsMasterClient)
+        {
+            
         }
     }
 
