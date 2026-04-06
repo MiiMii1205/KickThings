@@ -18,7 +18,9 @@ This mod is 100% client-side, so no, they don’t need to install it.
 That said, you'll get the best experience if everyone has the mod installed.
 Some interaction may be reduced or behave a bit differently when players without the mod are interacting with/using objects you are currently kicking.
 
-It's also recommanded that at the very least the host has it installed too for items physics among other things.
+It's also recommanded that at the very least the host has it installed too to sync physics among other things.
+
+_If the host doens't have the mod installed, there will be no physics interaction_ 
 
 ### Does this mod re-enable kicks in normal runs? ###
 
