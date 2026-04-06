@@ -5,10 +5,10 @@ using UnityEngine;
 
 namespace KickThings.Handler;
 
-public class KickThingsHandler: MonoBehaviourPun
+public class KickThingsHandler : MonoBehaviourPun
 {
     private const int KickThingsViewID = 5898;
-    
+
     private static KickThingsHandler _instance = null!;
 
     public PhotonView view = null!;
@@ -21,11 +21,11 @@ public class KickThingsHandler: MonoBehaviourPun
         {
             if (_instance == null)
             {
-
                 var go = new GameObject("KickThingsHandler");
                 _instance = go.AddComponent<KickThingsHandler>();
                 DontDestroyOnLoad(go);
             }
+
             return _instance;
         }
     }
@@ -64,6 +64,23 @@ public class KickThingsHandler: MonoBehaviourPun
         }
     }
 
+    [PunRPC]
+    public void RPC_KickItem(PhotonView itemView, Vector3 kickForce, Vector3 pos)
+    {
+        Plugin.Log.LogInfo($"Received kicking #{itemView}");
+        var it = itemView.GetComponent<Item>();
+        it.rig.AddForceAtPosition(kickForce, pos, ForceMode.Impulse);
+    }
+    
+    [PunRPC]
+    public void RPC_KickRopeSegment(PhotonView itemView, int segmentIndex, Vector3 kickForce, Vector3 pos)
+    {
+        Plugin.Log.LogInfo($"Received kicking #{itemView}");
+        var it = itemView.GetComponent<Rope>();
+        var rig = it.GetRopeSegments()[segmentIndex].gameObject.GetComponent<Rigidbody>();
+        rig.AddForceAtPosition(kickForce, pos, ForceMode.Impulse);
+    }
+
     public static bool IsRegistered(int playerId)
     {
         return Instance.m_registeredPlayers.Contains(playerId);
@@ -78,6 +95,5 @@ public class KickThingsHandler: MonoBehaviourPun
         {
             Instance.view.RPC("RPC_RegisterPlayer", RpcTarget.Others, playerId);
         }
-        
     }
 }

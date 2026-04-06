@@ -192,7 +192,9 @@ public partial class Plugin : BaseUnityPlugin
                             Vector3.Distance(character.Center, mob.Center());
 
                         mob.mobState = Mob.MobState.RigidbodyControlled;
-                        mob.rig.AddForceAtPosition(character.data.lookDirection * kickForce, point, ForceMode.Impulse);
+                        
+                        KickThingsHandler.Instance.view.RPC("RPC_KickItem", RpcTarget.All,
+                            mob.photonView, character.data.lookDirection * kickForce, point);
                         
                         KickImpact(character, mob.gameObject,
                             point, ref
@@ -228,10 +230,10 @@ public partial class Plugin : BaseUnityPlugin
                             it.SetKinematicNetworked(false);
                             it.lastHolderCharacter = character;
                         }
-
-                        it.rig.AddForceAtPosition(character.data.lookDirection * kickForce, point, ForceMode.Impulse);
                         
-
+                        KickThingsHandler.Instance.view.RPC("RPC_KickItem", RpcTarget.All,
+                            it.view, character.data.lookDirection * kickForce, point);
+                        
                         KickImpact(character, it.gameObject, point, ref
                             kickedThings);
                         
@@ -249,7 +251,10 @@ public partial class Plugin : BaseUnityPlugin
                         var point = character.Center + character.data.lookDirection *
                             Vector3.Distance(character.Center, seg.Center());
 
-                        rig.AddForceAtPosition(character.data.lookDirection * kickForce, point, ForceMode.Impulse);
+                        var ind = rope.GetRopeSegments().IndexOf(seg.transform);
+                        
+                        KickThingsHandler.Instance.view.RPC("RPC_KickRopeSegment", RpcTarget.All, rope.view, ind,
+                            character.data.lookDirection * kickForce, point);
                         
                         // Make every climbing character fall.
                         foreach (var chara in rope.charactersClimbing)
