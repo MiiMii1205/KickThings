@@ -73,6 +73,17 @@ public class KickThingsHandler : MonoBehaviourPun
     }
     
     [PunRPC]
+    public void RPC_KickMob(PhotonView itemView, Vector3 kickForce, Vector3 pos)
+    {
+        Plugin.Log.LogInfo($"Received kicking #{itemView}");
+        var mob = itemView.GetComponent<Mob>();
+        
+        mob.mobState = Mob.MobState.RigidbodyControlled;
+        
+        mob.rig.AddForceAtPosition(kickForce, pos, ForceMode.Impulse);
+    }
+    
+    [PunRPC]
     public void RPC_KickRopeSegment(PhotonView itemView, int segmentIndex, Vector3 kickForce, Vector3 pos)
     {
         Plugin.Log.LogInfo($"Received kicking #{itemView}");

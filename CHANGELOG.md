@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2] - 2026-04-06
+
+### Changed
+
+- Added descriptive logs for when mod support is lacking.
+- Changed mob kick RPCs
+
 ## [1.1.1] - 2026-04-05
 
 ### Fixed

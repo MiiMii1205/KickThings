@@ -187,18 +187,25 @@ public partial class Plugin : BaseUnityPlugin
                     if (!kickedThings.Contains(mob.gameObject.GetInstanceID()))
                     {
                         Log.LogInfo($"Kicking mob: {mob}");
-                        
+
                         var point = character.Center + character.data.lookDirection *
                             Vector3.Distance(character.Center, mob.Center());
 
-                        mob.mobState = Mob.MobState.RigidbodyControlled;
-                        
-                        KickThingsHandler.Instance.view.RPC("RPC_KickItem", RpcTarget.All,
-                            mob.photonView, character.data.lookDirection * kickForce, point);
-                        
+                        if(KickThingsHandler.IsRegistered(mob.photonView.Owner.ActorNumber))
+                        {
+                            KickThingsHandler.Instance.view.RPC("RPC_KickMob", RpcTarget.All,
+                                mob.photonView, character.data.lookDirection * kickForce, point);
+                            
+                        }
+                        else
+                        {
+                            Log.LogWarning($"Mob owner ({mob.photonView.Owner.ActorNumber}) is not registered. Not kicking mob {mob}");
+                        }
+
                         KickImpact(character, mob.gameObject,
                             point, ref
                             kickedThings);
+                        
                     }
                     
                 } else if (rig.TryGetComponent(out Spider spid))
@@ -221,19 +228,28 @@ public partial class Plugin : BaseUnityPlugin
                     if (!kickedThings.Contains(it.gameObject.GetInstanceID()))
                     {
                         Log.LogInfo($"Kicking item: {it}");
-                        
+
                         var point = character.Center + character.data.lookDirection *
                             Vector3.Distance(character.Center, it.Center());
-
-                        if (rig.isKinematic && kickableKinematicItemList.Contains(it.UIData.itemName))
+                        
+                        if (KickThingsHandler.IsRegistered(it.photonView.Owner.ActorNumber))
                         {
-                            it.SetKinematicNetworked(false);
-                            it.lastHolderCharacter = character;
+                            if (rig.isKinematic && kickableKinematicItemList.Contains(it.UIData.itemName))
+                            {
+                                it.SetKinematicNetworked(false);
+                                it.lastHolderCharacter = character;
+                            }
+
+                            KickThingsHandler.Instance.view.RPC("RPC_KickItem", RpcTarget.All,
+                                it.view, character.data.lookDirection * kickForce, point);
+
                         }
-                        
-                        KickThingsHandler.Instance.view.RPC("RPC_KickItem", RpcTarget.All,
-                            it.view, character.data.lookDirection * kickForce, point);
-                        
+                        else
+                        {
+                            Log.LogWarning(
+                                $"Item owner ({it.photonView.Owner.ActorNumber}) is not registered. Not kicking item {it}");
+                        }
+
                         KickImpact(character, it.gameObject, point, ref
                             kickedThings);
                         
@@ -250,11 +266,20 @@ public partial class Plugin : BaseUnityPlugin
 
                         var point = character.Center + character.data.lookDirection *
                             Vector3.Distance(character.Center, seg.Center());
-
-                        var ind = rope.GetRopeSegments().IndexOf(seg.transform);
                         
-                        KickThingsHandler.Instance.view.RPC("RPC_KickRopeSegment", RpcTarget.All, rope.view, ind,
-                            character.data.lookDirection * kickForce, point);
+                        if (KickThingsHandler.IsRegistered(rope.photonView.Owner.ActorNumber))
+                        {
+                            var ind = rope.GetRopeSegments().IndexOf(seg.transform);
+
+                            KickThingsHandler.Instance.view.RPC("RPC_KickRopeSegment", RpcTarget.All, rope.view, ind,
+                                character.data.lookDirection * kickForce, point);
+                        }
+                        else
+                        {
+                            Log.LogWarning(
+                                $"Rope owner ({rope.photonView.Owner.ActorNumber}) is not registered. No physics for rope {rope}");
+                        }
+
                         
                         // Make every climbing character fall.
                         foreach (var chara in rope.charactersClimbing)
