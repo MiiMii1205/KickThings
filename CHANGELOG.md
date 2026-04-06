@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.1] - 2026-04-05
+
+### Fixed
+
+- Fixed bugs with item kicking.
+
 ## [1.1.0] - 2026-04-05
 
 ### Added
