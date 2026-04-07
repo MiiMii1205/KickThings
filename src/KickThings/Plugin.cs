@@ -114,6 +114,7 @@ public partial class Plugin : BaseUnityPlugin
                 {
                     it.SetKinematicNetworked(false);
                     it.lastHolderCharacter = character;
+                    it.lastThrownCharacter = character;
                     totalSpawn++;
                     activatedItemSet.Add(it.gameObject.GetInstanceID());
                 }
@@ -149,8 +150,12 @@ public partial class Plugin : BaseUnityPlugin
                         hive.TryGetComponent(out Item beehiveItem))
                     {
                         Log.LogInfo($"Kicking beehive {hive}");
+                        
                         beehiveItem.SetKinematicNetworked(false);
-                        hive.currentBees.photonView.RPC("SetBeesAngryRPC", RpcTarget.AllBuffered, true);
+                        beehiveItem.lastThrownCharacter = character;
+                        beehiveItem.lastHolderCharacter = character;
+                        
+                        hive.currentBees.photonView.RPC(nameof(BeeSwarm.SetBeesAngryRPC), RpcTarget.AllBuffered, true);
                         activatedItemSet.Add(hive.gameObject.GetInstanceID());
                     }
                 }
@@ -221,15 +226,27 @@ public partial class Plugin : BaseUnityPlugin
                         var point = character.Center + character.data.lookDirection *
                             Vector3.Distance(character.Center, mob.Center());
 
-                        // Requesting ownership for physics syncs 
-                        mob.photonView.RequestOwnership();
+                        if (!mob.photonView.IsMine)
+                        {
+                            // Requesting ownership for physics syncs 
+                            mob.photonView.RequestOwnership();
 
-                        yield return new WaitUntil(() => mob._mobItem.view.AmOwner);
-
+                            yield return new WaitUntil(() => mob.photonView.IsMine);
+                        }
+                        
                         mob.mobState = Mob.MobState.RigidbodyControlled;
 
+                        if (mob.rig.isKinematic && kickableKinematicItemList.Contains(mob._mobItem.UIData.itemName))
+                        {
+                            mob._mobItem.SetKinematicNetworked(false);
+                            mob._mobItem.lastHolderCharacter = character;
+                            mob._mobItem.lastThrownCharacter = character;
+                        }
+                        
                         mob.rig.AddForceAtPosition(character.data.lookDirection * kickForce, point, ForceMode.Impulse);
 
+                        mob._mobItem.physicsSyncer.ForceSyncForFrames(3);
+                        
                         KickImpact(character, mob.gameObject,
                             point, ref
                             kickedThings);
@@ -257,20 +274,24 @@ public partial class Plugin : BaseUnityPlugin
                         var point = character.Center + character.data.lookDirection *
                             Vector3.Distance(character.Center, it.Center());
 
-                        // Requesting ownership for physics syncs 
-                        it.photonView.RequestOwnership();
+                        if(!it.photonView.IsMine)
+                        {
+                            // Requesting ownership for physics syncs 
+                            it.photonView.RequestOwnership();
+
+                            yield return new WaitUntil(() => it.view.IsMine);
+                        }
 
                         if (rig.isKinematic && kickableKinematicItemList.Contains(it.UIData.itemName))
                         {
                             it.SetKinematicNetworked(false);
                             it.lastHolderCharacter = character;
+                            it.lastThrownCharacter = character;
                         }
-
-                        yield return new WaitUntil(() => it.view.AmOwner);
 
                         it.rig.AddForceAtPosition(character.data.lookDirection * kickForce, point, ForceMode.Impulse);
 
-                        it.physicsSyncer.ForceSyncForFrames();
+                        it.physicsSyncer.ForceSyncForFrames(3);
 
                         KickImpact(character, it.gameObject, point, ref
                             kickedThings);
@@ -287,10 +308,12 @@ public partial class Plugin : BaseUnityPlugin
                         var point = character.Center + character.data.lookDirection *
                             Vector3.Distance(character.Center, seg.Center());
 
+                        var segPoint = seg.Center();
+                        
                         // Make every climbing character fall.
                         foreach (var chara in rope.charactersClimbing)
                         {
-                            if (rope.antigrav ? chara.Center.y < point.y : chara.Center.y > point.y)
+                            if (rope.antigrav ? chara.Center.y > segPoint.y : chara.Center.y < segPoint.y)
                             {
                                 Log.LogWarning(
                                     $"{chara.gameObject.name} is passed the affected segment. Skipping...");
@@ -300,8 +323,9 @@ public partial class Plugin : BaseUnityPlugin
                             {
                                 Log.LogWarning(
                                     $"Dropping {chara.gameObject.name} off of {rope}.");
-                                chara.view.RPC("StopRopeClimbingRpc", RpcTarget.All);
-                                chara.view.RPC("RPCA_Fall", RpcTarget.All, 1);
+                                chara.view.RPC(
+                                    nameof(CharacterRopeHandling.StopRopeClimbingRpc), RpcTarget.All);
+                                chara.view.RPC(nameof(Character.RPCA_Fall), RpcTarget.All, 1f);
                             }
                             else
                             {
@@ -341,10 +365,12 @@ public partial class Plugin : BaseUnityPlugin
                         var point = character.Center + character.data.lookDirection *
                             Vector3.Distance(character.Center, seg.Center());
 
+                        var segPoint = seg.Center();
+                        
                         // Make every climbing character fall.
                         foreach (var chara in rope.charactersClimbing)
                         {
-                            if (rope.antigrav ? chara.Center.y < point.y : chara.Center.y > point.y)
+                            if (rope.antigrav ? chara.Center.y > segPoint.y : chara.Center.y < segPoint.y)
                             {
                                 Log.LogWarning(
                                     $"{chara.gameObject.name} is passed the affected segment. Skipping...");
@@ -354,8 +380,10 @@ public partial class Plugin : BaseUnityPlugin
                             {
                                 Log.LogWarning(
                                     $"Dropping {chara.gameObject.name} off of {rope}.");
-                                chara.view.RPC("StopRopeClimbingRpc", RpcTarget.All);
-                                chara.view.RPC("RPCA_Fall", RpcTarget.All, 1);
+                                
+                                chara.view.RPC(
+                                    nameof(CharacterRopeHandling.StopRopeClimbingRpc), RpcTarget.All);
+                                chara.view.RPC(nameof(Character.RPCA_Fall), RpcTarget.All, 1f);
                             }
                             else
                             {
@@ -386,8 +414,9 @@ public partial class Plugin : BaseUnityPlugin
                                     {
                                         Log.LogWarning(
                                             $"Dropping {chara.gameObject.name} off of {jungleVine}.");
-                                        chara.refs.vineClimbing.view.RPC("StopVineClimbingRpc", RpcTarget.All);
-                                        chara.view.RPC("RPCA_Fall", RpcTarget.All, 1);
+                                        chara.refs.vineClimbing.view.RPC(
+                                            nameof(CharacterVineClimbing.StopVineClimbingRpc), RpcTarget.All);
+                                        chara.view.RPC(nameof(Character.RPCA_Fall), RpcTarget.All, 1f);
                                     }
                                     else
                                     {
@@ -419,7 +448,7 @@ public partial class Plugin : BaseUnityPlugin
                             {
                                 Log.LogInfo(
                                     $"Every people on the bridge are registered. Breaking {bridge}. Remember it's your fault {Character.localCharacter.characterName}");
-                                bridge.photonView.RPC("ShakeBridge_Rpc", RpcTarget.All);
+                                bridge.photonView.RPC(nameof(BreakableBridge.ShakeBridge_Rpc), RpcTarget.All);
                             }
                             else
                             {
@@ -453,7 +482,7 @@ public partial class Plugin : BaseUnityPlugin
 
     private static void KickImpact(Character character, GameObject thing, Vector3 point, ref HashSet<int> kickedThings)
     {
-        character.view.RPC("RPCA_KickImpact", RpcTarget.All, point);
+        character.view.RPC(nameof(CharacterGrabbing.RPCA_KickImpact), RpcTarget.All, point);
         kickedThings.Add(thing.GetInstanceID());
     }
 }
