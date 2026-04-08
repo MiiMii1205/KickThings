@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.2] - 2026-04-08
+
+### Changed
+
+- Fixed bugs with Roots mobs not being kicked properly
+
 ## [1.2.1] - 2026-04-07
 
 ### Changed

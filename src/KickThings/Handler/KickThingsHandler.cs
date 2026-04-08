@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using Photon.Pun;
 using UnityEngine;
@@ -12,9 +13,7 @@ public class KickThingsHandler : MonoBehaviourPunCallbacks
     private static KickThingsHandler _instance = null!;
 
     public PhotonView view = null!;
-
-    private HashSet<int> m_registeredPlayers = [];
-
+    
     public static KickThingsHandler Instance
     {
         get
@@ -27,16 +26,6 @@ public class KickThingsHandler : MonoBehaviourPunCallbacks
             }
 
             return _instance;
-        }
-    }
-
-    public override void OnPlayerEnteredRoom(Photon.Realtime.Player newPlayer)
-    {
-        base.OnPlayerEnteredRoom(newPlayer);
-
-        if (PhotonNetwork.IsMasterClient)
-        {
-            
         }
     }
 
@@ -59,62 +48,55 @@ public class KickThingsHandler : MonoBehaviourPunCallbacks
         returnView.ViewID = KickThingsViewID;
         return returnView;
     }
-
+    
     [PunRPC]
-    public void RPC_RegisterPlayer(int playerId)
+    public void RPC_KickMob(PhotonView mobView, Vector3 kickForce, Vector3 pos)
     {
-        if (m_registeredPlayers.Add(playerId))
-        {
-            Plugin.Log.LogInfo($"Registered player #{playerId}");
-        }
+        Plugin.Log.LogInfo($"Received kicking #{mobView}");
+        var mob = mobView.GetComponent<Mob>();
+        StartCoroutine(ApplyMobForce(mob, kickForce, pos));
+    }
 
-        if (PhotonNetwork.IsMasterClient && playerId != PhotonNetwork.LocalPlayer.ActorNumber)
-        {
-            view.RPC("RPC_RegisterPlayer", RpcTarget.Others, PhotonNetwork.LocalPlayer.ActorNumber);
-        }
+    private IEnumerator ApplyMobForce(Mob mob, Vector3 force, Vector3 pos)
+    {
+        var physicsSyncer = mob.GetComponent<PhysicsSyncer>();
+        mob.mobState = Mob.MobState.Dead;
+        
+        yield return new WaitUntil(() => mob.mobState == Mob.MobState.Dead);
+
+        mob.rig.AddForceAtPosition(force, pos, ForceMode.Impulse);
+        
+        mob.rig.rotation = Quaternion.LookRotation(mob.transform.forward, Vector3.down);
+        mob.transform.rotation = Quaternion.LookRotation(mob.transform.forward, Vector3.down);
+        
+        physicsSyncer.ForceSyncForFrames(3);
+        StartCoroutine(Plugin.ReanimateMob(mob));
     }
 
     [PunRPC]
-    public void RPC_KickItem(PhotonView itemView, Vector3 kickForce, Vector3 pos)
+    public void RPC_KickItem(PhotonView itemView, PhotonView charView, Vector3 kickForce, Vector3 pos)
     {
         Plugin.Log.LogInfo($"Received kicking #{itemView}");
         var it = itemView.GetComponent<Item>();
+        
         it.rig.AddForceAtPosition(kickForce, pos, ForceMode.Impulse);
+        it.physicsSyncer.ForceSyncForFrames(3);
+        
+        var chara = charView.GetComponent<Character>();
+
+        it.lastHolderCharacter = chara;
+        it.lastThrownCharacter = chara;
+    }
+    [PunRPC]
+    public void RPC_UpdateItemData(PhotonView itemView, PhotonView charView)
+    {
+        Plugin.Log.LogInfo($"Received kick data #{itemView}. Was kicked by {charView.Owner}");
+        
+        var it = itemView.GetComponent<Item>();
+        var chara = charView.GetComponent<Character>();
+        
+        it.lastHolderCharacter = chara;
+        it.lastThrownCharacter = chara;
     }
     
-    [PunRPC]
-    public void RPC_KickMob(PhotonView itemView, Vector3 kickForce, Vector3 pos)
-    {
-        Plugin.Log.LogInfo($"Received kicking #{itemView}");
-        var mob = itemView.GetComponent<Mob>();
-        
-        mob.mobState = Mob.MobState.RigidbodyControlled;
-        
-        mob.rig.AddForceAtPosition(kickForce, pos, ForceMode.Impulse);
-    }
-    
-    [PunRPC]
-    public void RPC_KickRopeSegment(PhotonView itemView, int segmentIndex, Vector3 kickForce, Vector3 pos)
-    {
-        Plugin.Log.LogInfo($"Received kicking #{itemView}");
-        var it = itemView.GetComponent<Rope>();
-        var rig = it.GetRopeSegments()[segmentIndex].gameObject.GetComponent<Rigidbody>();
-        rig.AddForceAtPosition(kickForce, pos, ForceMode.Impulse);
-    }
-
-    public static bool IsRegistered(int playerId)
-    {
-        return Instance.m_registeredPlayers.Contains(playerId);
-    }
-
-    public static void InitializeRegistry(int playerId)
-    {
-        Instance.m_registeredPlayers.Clear();
-        Instance.m_registeredPlayers.Add(playerId);
-
-        if (PhotonNetwork.InRoom)
-        {
-            Instance.view.RPC("RPC_RegisterPlayer", RpcTarget.Others, playerId);
-        }
-    }
 }
