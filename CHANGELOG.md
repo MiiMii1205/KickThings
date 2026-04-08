@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.3] - 2026-04-08
+
+### Changed
+
+- Fixed bugs with item getting duplicated on pick up after kicking.
+
 ## [1.2.2] - 2026-04-08
 
 ### Changed

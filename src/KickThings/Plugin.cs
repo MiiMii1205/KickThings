@@ -237,9 +237,15 @@ public partial class Plugin : BaseUnityPlugin
 
                             var point = character.Center + character.data.lookDirection *
                                 Vector3.Distance(character.Center, mob.Center());
+
+                            Photon.Realtime.Player? switchOwnershipBackTo = null;
+                            
+                            var shouldSwitchBackToOwner = false;
                             
                             if (!mob.photonView.IsMine)
                             {
+                                shouldSwitchBackToOwner = true;
+                                switchOwnershipBackTo = mob.photonView.Owner;
                                 // Requesting ownership for physics syncs 
                                 mob.photonView.RequestOwnership();
 
@@ -263,6 +269,11 @@ public partial class Plugin : BaseUnityPlugin
                             mob.GetComponent<PhysicsSyncer>().ForceSyncForFrames(3);
 
                             StartCoroutine(ReanimateMob(mob));
+                            
+                            if(shouldSwitchBackToOwner)
+                            {
+                                StartCoroutine(RetransferOwnershipDelay(mob.photonView, switchOwnershipBackTo!, 5));
+                            }
                             
                             KickImpact(character, mob.gameObject,
                                 point, ref
@@ -324,8 +335,14 @@ public partial class Plugin : BaseUnityPlugin
                             var point = character.Center + character.data.lookDirection *
                                 Vector3.Distance(character.Center, it.Center());
 
+                            Photon.Realtime.Player? switchOwnershipBackTo = null;
+
+                            var shouldSwitchBackToOwner = false;
+                            
                             if (!it.photonView.IsMine)
                             {
+                                shouldSwitchBackToOwner = true;
+                                switchOwnershipBackTo = it.view.Owner;
                                 // Requesting ownership for physics syncs 
                                 it.photonView.RequestOwnership();
 
@@ -343,7 +360,12 @@ public partial class Plugin : BaseUnityPlugin
                                 ForceMode.Impulse);
                             
                             it.physicsSyncer.ForceSyncForFrames(3);
-
+                            
+                            if (shouldSwitchBackToOwner)
+                            {
+                                StartCoroutine(RetransferOwnershipDelay(it.view, switchOwnershipBackTo!, 5));
+                            }
+                            
                             KickImpact(character, it.gameObject, point, ref
                                 kickedThings);
                             
@@ -600,6 +622,18 @@ public partial class Plugin : BaseUnityPlugin
                 }
             }
         }
+    }
+
+    private static IEnumerator RetransferOwnershipDelay(PhotonView componentPhotonView, Photon.Realtime.Player previousOwner, int f)
+    {
+        var frames = 0;
+        while (frames < f)
+        {
+            frames++;
+            yield return null;
+        }
+        
+        componentPhotonView.TransferOwnership(previousOwner);
     }
 
     public static IEnumerator ReanimateMob(Mob component)
