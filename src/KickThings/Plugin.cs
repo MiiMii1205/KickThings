@@ -633,7 +633,10 @@ public partial class Plugin : BaseUnityPlugin
             yield return null;
         }
         
-        componentPhotonView.TransferOwnership(previousOwner);
+        if (componentPhotonView != null)
+        {
+            componentPhotonView.TransferOwnership(previousOwner);
+        }
     }
 
     public static IEnumerator ReanimateMob(Mob component)
