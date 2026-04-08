@@ -106,23 +106,21 @@ public partial class Plugin : BaseUnityPlugin
 
             for (var j = 0; j < size1 && totalSpawn < maxBerrySpawn; j++)
             {
-                
                 if (possibleItems[j].attachedRigidbody != null &&
                     possibleItems[j].attachedRigidbody is { } jrig &&
                     jrig.gameObject.TryGetComponent(out Item it) &&
                     !activatedItemSet.Contains(it.gameObject.GetInstanceID()) &&
                     jrig.isKinematic && it.itemState == ItemState.Ground)
                 {
-
                     Log.LogInfo($"Making {it} fall...");
-                    
+
                     it.SetKinematicNetworked(false);
-                    
+
                     KickThingsHandler.Instance.view.RPC(nameof(KickThingsHandler.RPC_UpdateItemData), RpcTarget.All,
                         it.view, character.view);
-                    
+
                     totalSpawn++;
-                    
+
                     activatedItemSet.Add(it.gameObject.GetInstanceID());
                 }
             }
@@ -157,11 +155,12 @@ public partial class Plugin : BaseUnityPlugin
                         hive.TryGetComponent(out Item beehiveItem))
                     {
                         Log.LogInfo($"Kicking {hive.GetType().Name}: {hive}");
-                        
+
                         beehiveItem.SetKinematicNetworked(false);
-                        
-                        KickThingsHandler.Instance.view.RPC(nameof(KickThingsHandler.RPC_UpdateItemData), RpcTarget.All, beehiveItem.view, character.view);
-                        
+
+                        KickThingsHandler.Instance.view.RPC(nameof(KickThingsHandler.RPC_UpdateItemData), RpcTarget.All,
+                            beehiveItem.view, character.view);
+
                         hive.currentBees.photonView.RPC(nameof(BeeSwarm.SetBeesAngryRPC), RpcTarget.AllBuffered, true);
                         activatedItemSet.Add(hive.gameObject.GetInstanceID());
                     }
@@ -190,12 +189,13 @@ public partial class Plugin : BaseUnityPlugin
     {
         return PhotonNetwork.TryGetPlayer(player.GetActorNumber(), out var p) && IsRegistered(p);
     }
+
     private static bool IsRegistered(Photon.Realtime.Player p)
     {
         return (p.IsLocal && _kickThingsRegistered ||
-            (!p.IsLocal &&
-             p.CustomProperties.ContainsKey(
-                 nameof(_kickThingsRegistered))));
+                (!p.IsLocal &&
+                 p.CustomProperties.ContainsKey(
+                     nameof(_kickThingsRegistered))));
     }
 
     private IEnumerator DoKickThings(float kickDelay, float kickForce, Character character)
@@ -239,9 +239,9 @@ public partial class Plugin : BaseUnityPlugin
                                 Vector3.Distance(character.Center, mob.Center());
 
                             Photon.Realtime.Player? switchOwnershipBackTo = null;
-                            
+
                             var shouldSwitchBackToOwner = false;
-                            
+
                             if (!mob.photonView.IsMine)
                             {
                                 shouldSwitchBackToOwner = true;
@@ -251,7 +251,7 @@ public partial class Plugin : BaseUnityPlugin
 
                                 yield return new WaitUntil(() => mob.photonView.IsMine);
                             }
-                            
+
                             if (mob.rig.isKinematic && mob._mobItem != null)
                             {
                                 mob._mobItem.SetKinematicNetworked(false);
@@ -260,33 +260,32 @@ public partial class Plugin : BaseUnityPlugin
                             }
 
                             mob.mobState = Mob.MobState.Dead;
-                            
+
                             yield return new WaitUntil(() => mob.mobState == Mob.MobState.Dead);
-                            
-                            mob.rig.AddForceAtPosition(character.data.lookDirection *  ( kickForce * 100f / 5f ), point,
+
+                            mob.rig.AddForceAtPosition(character.data.lookDirection * (kickForce * 100f / 5f), point,
                                 ForceMode.Impulse);
-                            
+
                             mob.GetComponent<PhysicsSyncer>().ForceSyncForFrames(3);
 
                             StartCoroutine(ReanimateMob(mob));
-                            
-                            if(shouldSwitchBackToOwner)
+
+                            if (shouldSwitchBackToOwner)
                             {
                                 StartCoroutine(RetransferOwnershipDelay(mob.photonView, switchOwnershipBackTo!, 5));
                             }
-                            
+
                             KickImpact(character, mob.gameObject,
                                 point, ref
                                 kickedThings);
-                            
-                        } else if (IsRegistered(mob.photonView.Owner))
+                        }
+                        else if (IsRegistered(mob.photonView.Owner))
                         {
-
                             Log.LogInfo($"Kicking mob trough RPC: {mob}");
 
                             var point = character.Center + character.data.lookDirection *
                                 Vector3.Distance(character.Center, mob.Center());
-                            
+
                             KickThingsHandler.Instance.view.RPC(nameof(KickThingsHandler.RPC_KickMob), RpcTarget.All,
                                 mob.photonView,
                                 character.data.lookDirection * (kickForce * 100f / 5f), point);
@@ -297,9 +296,9 @@ public partial class Plugin : BaseUnityPlugin
                         }
                         else
                         {
-                            Log.LogWarning($"Mob owner ({mob.photonView.Owner}) doesn't have {Name} installed and can't transfer ownership (ownership is {mob.photonView.OwnershipTransfer}). Not kicking {mob}.");
+                            Log.LogWarning(
+                                $"Mob owner ({mob.photonView.Owner}) doesn't have {Name} installed and can't transfer ownership (ownership is {mob.photonView.OwnershipTransfer}). Not kicking {mob}.");
                         }
-                        
                     }
                     else
                     {
@@ -321,7 +320,6 @@ public partial class Plugin : BaseUnityPlugin
                     else
                     {
                         Log.LogInfo($"Already kicked {spid}. Skipping");
-                        
                     }
                 }
                 else if (rig.TryGetComponent(out Item it) && it.itemState == ItemState.Ground)
@@ -338,7 +336,7 @@ public partial class Plugin : BaseUnityPlugin
                             Photon.Realtime.Player? switchOwnershipBackTo = null;
 
                             var shouldSwitchBackToOwner = false;
-                            
+
                             if (!it.photonView.IsMine)
                             {
                                 shouldSwitchBackToOwner = true;
@@ -353,23 +351,24 @@ public partial class Plugin : BaseUnityPlugin
                             {
                                 it.SetKinematicNetworked(false);
                             }
-                            
-                            KickThingsHandler.Instance.view.RPC(nameof(KickThingsHandler.RPC_UpdateItemData), RpcTarget.All, it.view, character.photonView);
+
+                            KickThingsHandler.Instance.view.RPC(nameof(KickThingsHandler.RPC_UpdateItemData),
+                                RpcTarget.All, it.view, character.photonView);
 
                             it.rig.AddForceAtPosition(character.data.lookDirection * kickForce, point,
                                 ForceMode.Impulse);
-                            
+
                             it.physicsSyncer.ForceSyncForFrames(3);
-                            
+
                             if (shouldSwitchBackToOwner)
                             {
                                 StartCoroutine(RetransferOwnershipDelay(it.view, switchOwnershipBackTo!, 5));
                             }
-                            
+
                             KickImpact(character, it.gameObject, point, ref
                                 kickedThings);
-                            
-                        } else if (IsRegistered(it.view.Owner))
+                        }
+                        else if (IsRegistered(it.view.Owner))
                         {
                             Log.LogInfo($"Kicking item trough RPC: {it}");
 
@@ -384,7 +383,6 @@ public partial class Plugin : BaseUnityPlugin
                             KickImpact(character, mob.gameObject,
                                 point, ref
                                 kickedThings);
-                            
                         }
                         else
                         {
@@ -409,7 +407,7 @@ public partial class Plugin : BaseUnityPlugin
                             Vector3.Distance(character.Center, seg.Center());
 
                         var segPoint = seg.Center();
-                        
+
                         // Make every climbing character fall.
                         foreach (var c in rope.charactersClimbing)
                         {
@@ -423,10 +421,10 @@ public partial class Plugin : BaseUnityPlugin
                             {
                                 Log.LogWarning(
                                     $"Dropping {c.gameObject.name} off of {rope}.");
-                                
+
                                 c.view.RPC(
                                     nameof(CharacterRopeHandling.StopRopeClimbingRpc), RpcTarget.All);
-                                
+
                                 c.view.RPC(nameof(Character.RPCA_Fall), RpcTarget.All, 1f);
                             }
                             else
@@ -448,7 +446,7 @@ public partial class Plugin : BaseUnityPlugin
             else
             {
                 // Simple colliders interactions
-                
+
                 if (collider.GetComponentInParent<Spider>() is { } spid)
                 {
                     if (!kickedThings.Contains(spid.gameObject.GetInstanceID()))
@@ -494,7 +492,7 @@ public partial class Plugin : BaseUnityPlugin
                             Vector3.Distance(character.Center, seg.Center());
 
                         var segPoint = seg.Center();
-                        
+
                         // Make every climbing character fall.
                         foreach (var chara in rope.charactersClimbing)
                         {
@@ -508,7 +506,7 @@ public partial class Plugin : BaseUnityPlugin
                             {
                                 Log.LogWarning(
                                     $"Dropping {chara.gameObject.name} off of {rope}.");
-                                
+
                                 chara.view.RPC(
                                     nameof(CharacterRopeHandling.StopRopeClimbingRpc), RpcTarget.All);
                                 chara.view.RPC(nameof(Character.RPCA_Fall), RpcTarget.All, 1f);
@@ -624,7 +622,8 @@ public partial class Plugin : BaseUnityPlugin
         }
     }
 
-    private static IEnumerator RetransferOwnershipDelay(PhotonView componentPhotonView, Photon.Realtime.Player previousOwner, int f)
+    private static IEnumerator RetransferOwnershipDelay(PhotonView componentPhotonView,
+        Photon.Realtime.Player previousOwner, int f)
     {
         var frames = 0;
         while (frames < f)
@@ -632,7 +631,7 @@ public partial class Plugin : BaseUnityPlugin
             frames++;
             yield return null;
         }
-        
+
         if (componentPhotonView != null)
         {
             componentPhotonView.TransferOwnership(previousOwner);
