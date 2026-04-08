@@ -50,27 +50,66 @@ public class KickThingsHandler : MonoBehaviourPunCallbacks
     }
     
     [PunRPC]
-    public void RPC_KickMob(PhotonView mobView, Vector3 kickForce, Vector3 pos)
+    public void RPC_KickMob(PhotonView mobView, PhotonView charView, Vector3 kickForce, Vector3 pos)
     {
         Plugin.Log.LogInfo($"Received kicking #{mobView}");
         var mob = mobView.GetComponent<Mob>();
-        StartCoroutine(ApplyMobForce(mob, kickForce, pos));
+        
+        if(mob is Beetle)
+        {
+            StartCoroutine(ApplyMobForce(mob, charView, kickForce, pos));
+        }
+    }
+    [PunRPC]
+    public void RPC_SyncKickedRig(PhotonView kickedView, Vector3 linVel, Vector3 rotVel)
+    {
+        Plugin.Log.LogInfo($"Received kicked rigidbody #{kickedView}");
+        
+        var rig = kickedView.GetComponent<Rigidbody>();
+        
+        rig.angularVelocity = rotVel;
+        rig.linearVelocity = linVel;
     }
 
-    private IEnumerator ApplyMobForce(Mob mob, Vector3 force, Vector3 pos)
+    private IEnumerator ApplyMobForce(Mob mob, PhotonView charView, Vector3 force, Vector3 pos)
     {
-        var physicsSyncer = mob.GetComponent<PhysicsSyncer>();
-        mob.mobState = Mob.MobState.Dead;
+        var stateToUse = Mob.MobState.Dead;
         
-        yield return new WaitUntil(() => mob.mobState == Mob.MobState.Dead);
-
+        mob.mobState = stateToUse;
+        yield return new WaitUntil(() => mob.mobState == stateToUse);
+        
+        // if (mob is not Beetle)
+        // {
+        //     StartCoroutine(SetMobStateForSecs(mob, Mob.MobState.RigidbodyControlled, 2f));
+        // }
+        
         mob.rig.AddForceAtPosition(force, pos, ForceMode.Impulse);
         
-        mob.rig.rotation = Quaternion.LookRotation(mob.transform.forward, Vector3.down);
-        mob.transform.rotation = Quaternion.LookRotation(mob.transform.forward, Vector3.down);
+        if(charView.Owner.IsLocal)
+        {
+            if (mob._mobItem != null)
+            {
+                mob._mobItem.syncer.ForceSyncForFrames(3);
+            }
+            else if (mob.TryGetComponent(out PhysicsSyncer physicsSyncer))
+            {
+                physicsSyncer.ForceSyncForFrames(3);
+            }
+        }
         
-        physicsSyncer.ForceSyncForFrames(3);
         StartCoroutine(Plugin.ReanimateMob(mob));
+    }
+
+    private static IEnumerator SetMobStateForSecs(Mob mob, Mob.MobState state, float duration)
+    {
+        var t = 0f;
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            mob.mobState = state;
+            mob.rig.constraints = RigidbodyConstraints.None;
+            yield return null;
+        }
     }
 
     [PunRPC]
@@ -79,13 +118,19 @@ public class KickThingsHandler : MonoBehaviourPunCallbacks
         Plugin.Log.LogInfo($"Received kicking #{itemView}");
         var it = itemView.GetComponent<Item>();
         
-        it.rig.AddForceAtPosition(kickForce, pos, ForceMode.Impulse);
-        it.physicsSyncer.ForceSyncForFrames(3);
+        if (it.TryGetComponent(out Mob mb))
+        {
+            mb.mobState = Mob.MobState.RigidbodyControlled;
+        }
         
-        var chara = charView.GetComponent<Character>();
+        it.rig.AddForceAtPosition(kickForce, pos, ForceMode.Impulse);
+        
+        if(charView.Owner.IsLocal)
+        {
+            it.physicsSyncer.ForceSyncForFrames(3);
+        }
 
-        it.lastHolderCharacter = chara;
-        it.lastThrownCharacter = chara;
+        RPC_Registered(nameof(RPC_UpdateItemData), itemView, charView);
     }
     [PunRPC]
     public void RPC_UpdateItemData(PhotonView itemView, PhotonView charView)
@@ -98,5 +143,29 @@ public class KickThingsHandler : MonoBehaviourPunCallbacks
         it.lastHolderCharacter = chara;
         it.lastThrownCharacter = chara;
     }
-    
+
+    public void RPC_Registered(string methodName, params object[] parameters)
+    {
+        var playerList = PhotonNetwork.PlayerList;
+
+        for (int i = 0, length = playerList.Length; i < length; ++i)
+        {
+            if (Plugin.IsRegistered(playerList[i]))
+            {
+                view.RPC(methodName, playerList[i], parameters);
+            }
+        }
+    }
+    public void RPC_OtherRegistered(string methodName, params object[] parameters)
+    {
+        var playerList = PhotonNetwork.PlayerListOthers;
+
+        for (int i = 0, length = playerList.Length; i < length; ++i)
+        {
+            if (Plugin.IsRegistered(playerList[i]))
+            {
+                view.RPC(methodName, playerList[i], parameters);
+            }
+        }
+    }
 }

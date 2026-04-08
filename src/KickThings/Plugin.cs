@@ -185,12 +185,12 @@ public partial class Plugin : BaseUnityPlugin
             characterGrabbing.kickDelay, characterGrabbing.kickForce, characterGrabbing.character));
     }
 
-    private static bool IsRegistered(Player player)
+    public static bool IsRegistered(Player player)
     {
         return PhotonNetwork.TryGetPlayer(player.GetActorNumber(), out var p) && IsRegistered(p);
     }
 
-    private static bool IsRegistered(Photon.Realtime.Player p)
+    public static bool IsRegistered(Photon.Realtime.Player p)
     {
         return (p.IsLocal && _kickThingsRegistered ||
                 (!p.IsLocal &&
@@ -231,12 +231,14 @@ public partial class Plugin : BaseUnityPlugin
                 {
                     if (!kickedThings.Contains(mob.gameObject.GetInstanceID()))
                     {
+                        var mobKickForce = (kickForce * (mob.rig.mass) / 5f);
+
+                        var point = character.Center + character.data.lookDirection *
+                            Vector3.Distance(character.Center, mob.Center());
+
                         if (CanInteractPhysics(mob.photonView))
                         {
                             Log.LogInfo($"Kicking mob: {mob}");
-
-                            var point = character.Center + character.data.lookDirection *
-                                Vector3.Distance(character.Center, mob.Center());
 
                             Photon.Realtime.Player? switchOwnershipBackTo = null;
 
@@ -251,24 +253,9 @@ public partial class Plugin : BaseUnityPlugin
 
                                 yield return new WaitUntil(() => mob.photonView.IsMine);
                             }
-
-                            if (mob.rig.isKinematic && mob._mobItem != null)
-                            {
-                                mob._mobItem.SetKinematicNetworked(false);
-                                mob._mobItem.lastHolderCharacter = character;
-                                mob._mobItem.lastThrownCharacter = character;
-                            }
-
-                            mob.mobState = Mob.MobState.Dead;
-
-                            yield return new WaitUntil(() => mob.mobState == Mob.MobState.Dead);
-
-                            mob.rig.AddForceAtPosition(character.data.lookDirection * (kickForce * 100f / 5f), point,
-                                ForceMode.Impulse);
-
-                            mob.GetComponent<PhysicsSyncer>().ForceSyncForFrames(3);
-
-                            StartCoroutine(ReanimateMob(mob));
+                            
+                            KickThingsHandler.Instance.RPC_Registered(nameof(KickThingsHandler.RPC_KickMob),
+                                mob.photonView, character.view, character.data.lookDirection * mobKickForce, point);
 
                             if (shouldSwitchBackToOwner)
                             {
@@ -283,12 +270,10 @@ public partial class Plugin : BaseUnityPlugin
                         {
                             Log.LogInfo($"Kicking mob trough RPC: {mob}");
 
-                            var point = character.Center + character.data.lookDirection *
-                                Vector3.Distance(character.Center, mob.Center());
-
                             KickThingsHandler.Instance.view.RPC(nameof(KickThingsHandler.RPC_KickMob), RpcTarget.All,
                                 mob.photonView,
-                                character.data.lookDirection * (kickForce * 100f / 5f), point);
+                                character.view,
+                                character.data.lookDirection * mobKickForce, point);
 
                             KickImpact(character, mob.gameObject,
                                 point, ref
@@ -326,12 +311,14 @@ public partial class Plugin : BaseUnityPlugin
                 {
                     if (!kickedThings.Contains(it.gameObject.GetInstanceID()))
                     {
+                        var itemKickForce = (kickForce * (it.rig.mass) / 5f);
+
+                        var point = character.Center + character.data.lookDirection *
+                            Vector3.Distance(character.Center, it.Center());
+
                         if (CanInteractPhysics(it.view))
                         {
                             Log.LogInfo($"Kicking item: {it}");
-
-                            var point = character.Center + character.data.lookDirection *
-                                Vector3.Distance(character.Center, it.Center());
 
                             Photon.Realtime.Player? switchOwnershipBackTo = null;
 
@@ -352,13 +339,12 @@ public partial class Plugin : BaseUnityPlugin
                                 it.SetKinematicNetworked(false);
                             }
 
-                            KickThingsHandler.Instance.view.RPC(nameof(KickThingsHandler.RPC_UpdateItemData),
-                                RpcTarget.All, it.view, character.photonView);
-
-                            it.rig.AddForceAtPosition(character.data.lookDirection * kickForce, point,
-                                ForceMode.Impulse);
-
-                            it.physicsSyncer.ForceSyncForFrames(3);
+                            KickThingsHandler.Instance.RPC_Registered(nameof(KickThingsHandler.RPC_KickItem),
+                                it.view,
+                                character.view,
+                                character.data.lookDirection * itemKickForce,
+                                point
+                            );
 
                             if (shouldSwitchBackToOwner)
                             {
@@ -371,14 +357,13 @@ public partial class Plugin : BaseUnityPlugin
                         else if (IsRegistered(it.view.Owner))
                         {
                             Log.LogInfo($"Kicking item trough RPC: {it}");
-
-                            var point = character.Center + character.data.lookDirection *
-                                Vector3.Distance(character.Center, it.Center());
-
+                            
                             KickThingsHandler.Instance.view.RPC(nameof(KickThingsHandler.RPC_KickItem), RpcTarget.All,
                                 it.photonView,
                                 character.photonView,
-                                character.data.lookDirection * kickForce, point);
+                                character.data.lookDirection * itemKickForce,
+                                point
+                            );
 
                             KickImpact(character, mob.gameObject,
                                 point, ref
@@ -641,7 +626,7 @@ public partial class Plugin : BaseUnityPlugin
     public static IEnumerator ReanimateMob(Mob component)
     {
         yield return new WaitForSeconds(6);
-        component.mobState = Mob.MobState.RigidbodyControlled;
+        component.mobState = Mob.MobState.Flipping;
     }
 
     private static bool CanInteractPhysics(PhotonView componentView)
