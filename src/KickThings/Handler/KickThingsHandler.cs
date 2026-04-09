@@ -8,45 +8,14 @@ namespace KickThings.Handler;
 
 public class KickThingsHandler : MonoBehaviourPunCallbacks
 {
-    private const int KickThingsViewID = 5898;
-
-    private static KickThingsHandler _instance = null!;
-
     public PhotonView view = null!;
     
-    public static KickThingsHandler Instance
-    {
-        get
-        {
-            if (_instance == null)
-            {
-                var go = new GameObject("KickThingsHandler");
-                _instance = go.AddComponent<KickThingsHandler>();
-                DontDestroyOnLoad(go);
-            }
-
-            return _instance;
-        }
-    }
+    public static KickThingsHandler Instance { get; private set; } = null!;
 
     private void Awake()
     {
-        if (_instance != null && _instance != this)
-        {
-            Destroy(gameObject);
-        }
-        else
-        {
-            _instance = this;
-            view = GetComponent<PhotonView>() ?? InitializeView();
-        }
-    }
-
-    private PhotonView InitializeView()
-    {
-        var returnView = gameObject.AddComponent<PhotonView>();
-        returnView.ViewID = KickThingsViewID;
-        return returnView;
+        Instance = this;
+        view = GetComponent<PhotonView>();
     }
     
     [PunRPC]
