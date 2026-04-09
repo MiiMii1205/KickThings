@@ -6,6 +6,7 @@
 
 - Fixed bugs with item getting duplicated on pick up after kicking.
 - Smoothed out item physics.
+- Fixed bugs with PhotonViews not getting found.
 
 ## [1.2.2] - 2026-04-08
 
